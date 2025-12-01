@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, Camera, Loader, X, Info } from 'lucide-react';
+import { Upload, Camera, Loader, X, Info, AlertCircle } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
 
 interface AnalyzePageProps {
@@ -67,11 +67,15 @@ export function AnalyzePage({ user, onNavigate }: AnalyzePageProps) {
     setAnalyzing(true);
 
     try {
+      console.log('🔍 Starting analysis process...');
+      console.log('Image file:', selectedImage.name, selectedImage.type, selectedImage.size, 'bytes');
+      
       // Upload image to Supabase Storage
       const formData = new FormData();
       formData.append('file', selectedImage);
       formData.append('userId', user.id);
 
+      console.log('📤 Uploading image...');
       const uploadResponse = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-83197308/upload-image`,
         {
@@ -83,13 +87,19 @@ export function AnalyzePage({ user, onNavigate }: AnalyzePageProps) {
         }
       );
 
+      console.log('Upload response status:', uploadResponse.status);
+
       if (!uploadResponse.ok) {
-        throw new Error('Failed to upload image');
+        const errorData = await uploadResponse.json();
+        console.error('Upload error response:', errorData);
+        throw new Error(errorData.error || 'Failed to upload image');
       }
 
       const { imageUrl } = await uploadResponse.json();
+      console.log('✅ Image uploaded successfully');
 
       // Call analyze endpoint
+      console.log('🔬 Analyzing image...');
       const analyzeResponse = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-83197308/analyze`,
         {
@@ -105,11 +115,16 @@ export function AnalyzePage({ user, onNavigate }: AnalyzePageProps) {
         }
       );
 
+      console.log('Analyze response status:', analyzeResponse.status);
+
       if (!analyzeResponse.ok) {
-        throw new Error('Analysis failed');
+        const errorData = await analyzeResponse.json();
+        console.error('Analysis error response:', errorData);
+        throw new Error(errorData.error || 'Analysis failed');
       }
 
       const result = await analyzeResponse.json();
+      console.log('✅ Analysis complete:', result);
 
       // Navigate to results page
       onNavigate('result', {
@@ -122,8 +137,8 @@ export function AnalyzePage({ user, onNavigate }: AnalyzePageProps) {
         recommendations: result.recommendations,
       });
     } catch (error: any) {
-      console.error('Analysis error:', error);
-      alert('Failed to analyze image. Please try again.');
+      console.error('❌ Analysis error:', error);
+      alert(`Analysis error: ${error.message || 'Please try again.'}`);
     } finally {
       setAnalyzing(false);
     }
